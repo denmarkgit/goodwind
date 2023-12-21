@@ -1,0 +1,40 @@
+---
+- name: Install nginx
+  hosts: all
+  become: true
+  gather_facts: false
+  
+
+  tasks:
+    - name: update
+      apt:
+        update_cache: true
+        state: latest
+      register: apt_status
+  # 2018 syntax:
+  # until: apt_status|success
+  # 2020 syntax:
+  #
+    - name: Wait for cloud-init / user-data to finish
+      command: cloud-init status --wait
+      when: "'lxc' not in group_names"
+      changed_when: false
+      no_log: true
+
+    - name: Wait for cloud init to finish
+      community.general.cloud_init_data_facts:
+        filter: status
+      register: res
+      until: "res.cloud_init_data_facts.status.v1.stage is defined and not res.cloud_init_data_facts.status.v1.stage"
+      when: "'lxc' not in group_names"
+      retries: 50
+      delay: 5
+      until: apt_status is success
+      delay: 6
+      retries: 10
+
+    - name: install apache
+      apt:
+        name: apache2
+        state: latest
+
